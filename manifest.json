@@ -1,0 +1,16 @@
+{
+   "content_scripts": [ {
+      "exclude_globs": [  ],
+      "exclude_matches": [  ],
+      "include_globs": [ "*" ],
+      "js": [ "jsxcompressor.min.js","PrismataReplays.user.js" ],
+      "matches": [ "http://*/*", "https://*/*" ],
+      "run_at": "document_idle"
+   } ],
+   "converted_from_user_script": true,
+   "description": "",
+   "key": "OckJPghYqcJgebxFCcE164p5JIDG49fKB5oWZCfMa1Y=",
+   "name": "Prismata Replay",
+   "version": "1.0",
+   "manifest_version": 2
+}
