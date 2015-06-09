@@ -1,14 +1,12 @@
-﻿// ==UserScript==
-// @name        PrismataReplays
-// @namespace   devonparsons.com
-// @description Builds a Replay object from a Prismata replay code
-// @version     1
-// @grant       none
-// @require     ./jsxcompressor.min.js
-// ==/UserScript==
+﻿"use strict";
 
 (function(module) {
 
+  /**
+   * Gives the amount of attack in a resource string
+   * @param {string} receive
+   * @return {number} attack
+   */
   module.attack = function(receive){
     if (typeof receive == "string"){
       return (receive.match(/x/ig) || []).length;
@@ -26,9 +24,7 @@
   };
 
   function jsonToReplay(json) {
-    // console.log(JSON.stringify(json));
-    console.log("converting replay");
-    console.log(JSON.stringify(json));
+    // console.log(JSON.stringify(json)); // raw json
 
     const rarity = {
       "trinket"   : 20, 
@@ -37,6 +33,7 @@
       "legendary" : 1
     };
 
+    // TODO: Grab this from the replay and remove from here
     const baseSet = [
       "Engineer",
       "Drone", 
@@ -83,51 +80,49 @@
     // Match Info
     replay.json = json;
     replay.code = json.code;
+    replay.link = "http://play.prismata.net/?r=" + json.code;
     replay.startTime = new Date(json.startTime * 1000);
     replay.duration = new Date(json.endTime * 1000) - replay.startTime;
     replay.endCondition = endCondition[json.endCondition];
     replay.result = result[json.result];
+    replay.turns = Math.ceil((json.commandInfo.clicksPerTurn.length)/2);
     
     replay.timeControls = {};
     replay.timeControls.white = json.timeInfo.playerTime[0].increment;
     replay.timeControls.black = json.timeInfo.playerTime[1].increment;
 
     // replay.turns = 
-    // replay.winner = 
-
 
     //Unit Info
     replay.gameUnits = [];
     json.deckInfo.mergedDeck.forEach(function(hash){
-      // console.log("Starting unit:");
-      // console.log(hash);
 
-      unit = {};
+      var unit = {};
 
       unit.name     = hash.UIName || hash.name;
       unit.cardText = hash.shortname || unit.name;
       unit.refer    = hash.name;
       
       unit.abilityScript = hash.abilityScript;
-      unit.abilityCost   = hash.abilityScript && module.translate(hash.abilityCost) || hash.HPUsed && String(hash.HPUsed) + "HP");
+      unit.abilityCost   = hash.abilityScript && module.translate(hash.abilityCost) || hash.HPUsed && String(hash.HPUsed) + "HP";
       unit.turnScript    = hash.beginOwnTurnScript;
 
       unit.cost      = module.translate(hash.buyCost);
       unit.health    = hash.toughness || 1;
       unit.supply    = rarity[hash.rarity];
       unit.buildTime = hash.buildTime || 1;
+
       unit.blocker   = hash.defaultBlocking == 1;
-      unit.prompt    = hash.buildTime === 0;
       unit.stamina   = hash.charge || -1;
       unit.exhaust   = unit.turnScript && unit.turnScript.delay || unit.abilityScript && unit.abilityScript.delay || -1
-
+      unit.prompt    = hash.buildTime === 0;
       unit.fragile   = hash.fragile == 1;
       unit.chill     = hash.targetAction == "disrupt" ? hash.targetAmount : -1;
       unit.lifespan  = hash.lifespan || -1;
       unit.spell     = hash.spell == 1;
       unit.frontline = hash.undefendable == 1;
 
-      //Needed for Xaetron and Mahar
+      // Xaetron, Mahar
       unit.maxHealth = hash.HPMax || unit.health;  
       unit.regen     = hash.HPGained || 0;
 
@@ -143,6 +138,10 @@
           break;
         case "Kinetic Driver":
           unit.snipeCondition = {"unit": ["Animus", "Blastforge", "Conduit"]}
+          unit.maxAttack = 3;
+          break;
+        default:
+          break;
       }
 
       unit.resonate    = hash.resonate; // Amporilla, Resophore 
@@ -154,30 +153,48 @@
 
       replay.gameUnits.push(unit);
 
-      // console.log(unit);
     });
 
     replay.baseSet = replay.gameUnits.filter(function(unit, index, arr){
-      return (baseSet.indexOf(unit.name) > -1);
+      return (json.logInfo.rawDeck.baseCards.indexOf(unit.refer) > -1);
+      // return (baseSet.indexOf(unit.name) > -1);
     });
 
-    console.log(json);
     replay.randomSet = replay.gameUnits.filter(function(unit, index, arr){
       return (json.deckInfo.randomizer[0].indexOf(unit.refer) > -1);
     });
 
 
     // Player Info
-    replay.players = {"white": {}, "black": {}};
+    replay.players = {};
 
-    player
+    ["white", "black"].forEach(function setPlayer(color, index, arr){
 
+      this[color] = {};
+      
+      this[color].name = json.playerInfo[index].displayName;
 
-    const skins = json.deckInfo.skinInfo;
-    console.log(skins);
-    
+      this[color].winner = false;
+      if (index == json.result){
+        this[color].winner = true;
+        replay.winner = color;
+      }
 
-    console.log(replay.players);
+      this[color].timeControl = json.timeInfo.playerTime[index].increment;
+
+      this[color].skins = {};
+      for (var unit in json.deckInfo.skinInfo){
+        if (json.deckInfo.skinInfo.hasOwnProperty(unit)){
+          this[color].skins[unit] = json.deckInfo.skinInfo[unit][index]; 
+        }
+      }
+
+      this[color].ratingInitial = Math.floor(json.ratingInfo.initialRatings[index].displayRating);
+      this[color].ratingFinal   = json.ratingInfo.finalRatings[index];
+      this[color].ratingChange  = json.ratingInfo.ratingChanges[index];
+      this[color].tier          = json.ratingInfo.initialRatings[index].tier;
+
+    }, replay.players);
 
     return replay;
   }
@@ -207,38 +224,32 @@
     xhr.responseType = 'blob';
     
     xhr.onload = function(e) {
-      console.log("onload called");
       if (this.status == 200) {
         var blob = this.response;
         var reader = new window.FileReader();
         reader.readAsDataURL(blob); 
     
         reader.onloadend = function() {
-          base64data = reader.result;   
+          var base64data = reader.result;   
           base64data = base64data.replace("data:application/octet-stream;base64,", '');   
-          decompressed_text = JXG.decompress(base64data);
+          const decompressed_text = JXG.decompress(base64data);
 
           if (!decompressed_text) {
-            console.log("error here");
-            return cb(new Error("Invalid replay (could not decode payload)"));
+            return cb(new Error("Non-extant replay (could not decode payload)"));
           } else {
-            console.log("no error");
             return cb(false, jsonToReplay(JSON.parse(decompressed_text)));
           }        
         };
     
       } else {
-        console.log("onload error!");
-        console.log(this.status);
+        return cb(new Error("AWS did not respond successfully"));
       }
-
     };
 
     xhr.onerror = function(error){
-      console.log("onerror error!");
-      console.log(error.target.status);
+      return cb(new Error("Unknown error during ajax request: " + error.message));
     };
-    
+
     xhr.send();
   };
 })(window.PrismataReplay = {});
@@ -247,12 +258,13 @@
 window.addEventListener("load", function() {
   console.log("PrismataReplay test");
 
-  PrismataReplay.getReplay("8utvx-yFxPJ", function(err, replay) {
+  PrismataReplay.getReplay("2v6uK-b2cEK", function(err, replay) {
     if (err) {
       console.log("Got error :(");
       console.log(err);
     } else {
       console.log("User plugin works!");
+      console.log (replay);
     }
   });
 }, false);
