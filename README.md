@@ -1,6 +1,6 @@
 # Prismata Replay
 
-A resource for developers to use to gain access to Prismta replay data using a replay code.
+A resource for developers to use to gain access to Prismata replay data using a replay code.
 
 Please refer to the LICENSE for terms of use. 
 
