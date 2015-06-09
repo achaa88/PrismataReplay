@@ -113,12 +113,12 @@
       unit.buildTime = hash.buildTime || 1;
 
       unit.blocker   = hash.defaultBlocking == 1;
-      unit.stamina   = hash.charge || -1;
-      unit.exhaust   = unit.turnScript && unit.turnScript.delay || unit.abilityScript && unit.abilityScript.delay || -1
+      unit.stamina   = hash.charge;
+      unit.exhaust   = unit.turnScript && unit.turnScript.delay || unit.abilityScript && unit.abilityScript.delay || 0;
       unit.prompt    = hash.buildTime === 0;
       unit.fragile   = hash.fragile == 1;
-      unit.chill     = hash.targetAction == "disrupt" ? hash.targetAmount : -1;
-      unit.lifespan  = hash.lifespan || -1;
+      unit.chill     = hash.targetAction == "disrupt" ? hash.targetAmount : 0;
+      unit.lifespan  = hash.lifespan;
       unit.spell     = hash.spell == 1;
       unit.frontline = hash.undefendable == 1;
 
